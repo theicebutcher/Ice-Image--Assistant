@@ -4,3 +4,4 @@ python-dotenv
 rapidfuzz
 flask-cors
 Pillow
+requests
