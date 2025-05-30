@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ice Butcher Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+
+    <style>
+        /* Basic Modal Styling */
+        .modal {
+            display: none;
+            position: fixed; /* Changed to fixed */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: 1001;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fefefe;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-height: 90%;
+            overflow: auto;
+            box-sizing: border-box;
+        }
+
+        .close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        #drawingCanvas {
+            width: 100%;
+            height: auto;
+            max-height: calc(100vh - 200px);
+            border: 1px solid #ccc;
+            cursor: crosshair;
+            display: block;
+            box-sizing: border-box;
+        }
+
+        .modal-buttons {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .modal-buttons button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin: 0 10px;
+            border-radius: 5px;
+        }
+
+        .modal-buttons button:hover {
+            background-color: #3e8e41;
+        }
+
+        /* Dropup styles */
+        .dropup {
+            position: relative;
+            display: inline-block;
+            z-index: 1000;
+        }
+
+        .dropup-content {
+    display: none; /* Only this display property should be here */
+    position: absolute;
+    bottom: 50px;
+    left: 0;
+    background-color: #f9f9f9;
+    min-width: 300px;
+    box-shadow: 0px -8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 2000;
+    border-radius: 10px 10px 0 0;
+    padding: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    flex-direction: row; /* Keep flex properties but remove display:flex */
+}
+
+        .dropup-column {
+            display: flex;
+            flex-direction: column; /* Stack items vertically within a column */
+            align-items: center;     /* Center items horizontally */
+            margin: 0 10px;         /* Add some horizontal margin between columns */
+            position: relative; /* Required for sticky positioning of the title */
+
+        }
+
+        .dropup-category-title {
+            text-align: center;
+            margin-bottom: 5px;
+            position: sticky; /* Make the title sticky */
+            top: 0;           /* Stick to the top of its container */
+            z-index: 1;        /* Ensure the title stays on top of the items */
+        }
+
+        .dropup-item {
+            text-align: center;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            transition: all 0.3s;
+            margin: 5px 0;          /* Add vertical margin for spacing within a column */
+        }
+
+
+
+        .dropup-item img {
+    width: 30px;       /* Fixed small width */
+    height: 50px;      /* Fixed small height */
+    object-fit: contain; /* Changed from 'cover' to 'contain' to ensure full visibility */
+    border-radius: 5px;
+    transition: all 0.3s;
+    background-color: #f0f0f0; /* Optional: adds background for transparent images */
+    padding: 2px;      /* Optional: adds some spacing around the image */
+}
+
+.dropup-item:hover img {
+    transform: scale(1.5);
+    z-index: 10;       /* Ensures enlarged image appears above others */
+    position: relative; /* Needed for z-index to work */
+}
+
+        .dropup-item span {
+            display: block;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+
+        .primary-action-btn {
+            position: relative;
+        }
+
+
+    </style>
+</head>
+<body>
+
+<!-- Chatbot Button -->
+<button id="chatbot-button" onclick="toggleChatbot()">
+    <img src="static/user.png" alt="Ice Engraving Logo">
+</button>
+
+<!-- Chatbot Container -->
+<div id="chatbot-container">
+    <div id="chat-header">
+        <div class="header-content">
+            <img src="static/user.png" alt="Ice Butcher Logo" class="header-logo">
+            <span class="header-title">Ice Butcher Assistant</span>
+        </div>
+        <button id="close-btn" onclick="toggleChatbot()" aria-label="Close Chatbot">
+            ×
+        </button>
+    </div>
+
+    <div id="chat-messages">
+        <!-- Initial Prompt Button -->
+    </div>
+
+    <div id="chat-input-container">
+        <!-- Dropup for sculpture options -->
+        <div class="dropup" id="templateDropupContainer">
+            <button id="start-prompt-button" class="primary-action-btn" onclick="toggleDropup()">
+                <i class="fas fa-ice-cream"></i> Select Ice Sculpture Designs<i class="fas fa-ice-cream"></i> 
+            </button>
+            <div class="dropup-content" id="template-dropup">
+                <!-- Templates will be dynamically inserted here -->
+            </div>
+        </div>
+
+        <div class="input-wrapper">
+            <input type="text" id="user-input" placeholder="Ask any questions...">
+
+            <!-- Microphone Button -->
+            <button id="mic-btn" onclick="startVoiceInput()">
+                <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+
+            <label for="image-upload" class="upload-btn">
+                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7m4 2v4m0 0l-2-2m2 2l2-2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </label>
+            <input type="file" id="image-upload" accept="image/*" multiple onchange="previewImage()" />
+            <div id="image-preview-container"></div>
+
+            <button id="send-btn" onclick="sendMessage()">
+                <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Image Modal (INSIDE Chatbot Container) -->
+    <div id="imageModal" class="modal">
+        <div class="modal-content">
+            <span class="close">×</span>
+            <div class="drawing-tools">
+                <label for="stroke">Stroke Color</label>
+                <input id="stroke" name='stroke' type="color" value="#ff0000">
+                <label for="lineWidth">Line Width</label>
+                <input id="lineWidth" name='lineWidth' type="number" value="5" min="1" max="50">
+                <button id="clearDrawingBtn">Clear</button>
+            </div>
+
+            <canvas id="drawingCanvas"></canvas>
+            <div class="modal-buttons">
+                <button id="confirmDrawingBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+   <div id="inlineFeedback" class="feedback-section" style="display: none; margin-top: 10px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+    <span class="close-feedback" style="float: right; font-size: 20px; cursor: pointer; color: #999;">×</span>
+    <h4 style="margin: 0 0 10px; font-size: 16px; color: #333;">Rate this Ice Sculpture</h4>
+    <div id="starRating" style="display: flex; gap: 5px; margin-bottom: 10px;">
+        <span class="star" data-value="1" style="font-size: 20px; cursor: pointer; color: #ccc;">★</span>
+        <span class="star" data-value="2" style="font-size: 20px; cursor: pointer; color: #ccc;">★</span>
+        <span class="star" data-value="3" style="font-size: 20px; cursor: pointer; color: #ccc;">★</span>
+        <span class="star" data-value="4" style="font-size: 20px; cursor: pointer; color: #ccc;">★</span>
+        <span class="star" data-value="5" style="font-size: 20px; cursor: pointer; color: #ccc;">★</span>
+    </div>
+    <textarea id="feedbackComment" placeholder="Optional: Add your comments..." style="width: 100%; height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: none; font-size: 14px;"></textarea>
+    <button id="submitFeedbackBtn" style="margin-top: 10px; padding: 8px 16px; background: #6082a6; color: white; border: none; border-radius: 6px; cursor: pointer; width: 100%;">Submit Feedback</button>
+</div>
+
+</div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+<script>
+    // Template data organized by rows
+    const templateCategories = [
+        {
+            name: "Ludges",
+            items: [
+                { type: "double ludge", name: "Double Ludge", image: "static/templates/ludge.png" },
+                { type: "martini ludge", name: "Martini Ludge", image: "static/templates/martini.png" },
+                { type: "tube ludge", name: "tube Ludge", image: "static/templates/tube.png" }
+
+            ]
+        },
+        {
+            name: "Topper Logos",
+            items: [
+                { type: "crown logo", name: "crown logo", image: "static/Topper/crown logo as topper.jpg" },
+                { type: "Oval logo", name: "Oval logo", image: "static/Topper/Oval logo for as topper.jpg" },
+                { type: "Swoosh logo", name: "Swoosh logo", image: "static/Topper/Swoosh logo.jpg" }
+
+            ]
+        },
+       {
+            name: "Toppers",
+            items: [
+                { type: "banana single luge", name: "banana single luge", image: "static/Topper/banana single luge.jpg" },
+                { type: "ice bar mini single luge", name: "ice bar mini single luge", image: "static/Topper/ice bar mini single luge.jpg" },
+                { type: "ice bowl", name: "ice bowl", image: "static/Topper/ice bowl.png" },
+              
+
+            ]
+       },
+       {
+        name: "Ice Bars",
+        items:[
+            {type: "6ft Ice Bar", name: "6ft Ice Bar", image: "static/Ice bars/6ft ice bar.jpg"},
+            {type: "8ft Ice Bar", name: "8ft Ice Bar", image: "static/Ice bars/8ft ice bar.jpg"}, 
+            {type: "12ft Ice Bar ", name: "12ft Ice Bar", image: "static/Ice bars/12ft ice bar.jpg"}
+        ]
+       }
+    // ,
+    //     {
+    //         name: "Showpieces",
+    //         items: [
+    //             { type: "vase", name: "Vase", image: "static/templates/alligator_head.png" },
+    //             { type: "logo", name: "Logo", image: "static/templates/alligator_head.png" },
+    //             { type: "abstract", name: "Abstract", image: "static/templates/alligator_head.png" }
+    //         ]
+    //     },
+    //     {
+    //         name: "Seafood Displays",
+    //         items: [
+    //             { type: "wedding", name: "Wedding", image: "static/templates/alligator_head.png" },
+    //             { type: "custom", name: "Custom", image: "static/templates/alligator_head.png" }
+    //         ]
+    //     }
+    ];
+
+    // Function to render template categories
+    function renderTemplateCategories() {
+        const dropupContent = document.getElementById('template-dropup');
+        dropupContent.innerHTML = ''; // Clear existing content
+
+        // Create columns first
+        const columns = {};
+// In your renderTemplateCategories function, modify how the category title is created
+            templateCategories.forEach(category => {
+                columns[category.name] = document.createElement('div');
+                columns[category.name].className = 'dropup-column';
+
+                // Create container div for the title
+                const titleContainer = document.createElement('div');
+                titleContainer.className = 'dropup-category-title-container';
+
+                // Add Category Title to its container
+                const categoryTitle = document.createElement('div');
+                categoryTitle.className = 'dropup-category-title';
+                categoryTitle.textContent = category.name;
+                
+                // Add title to container
+                titleContainer.appendChild(categoryTitle);
+                
+                // Add container to column
+                columns[category.name].appendChild(titleContainer);
+            });
+
+        // Add items to their respective columns
+        templateCategories.forEach(category => {
+            category.items.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'dropup-item';
+                itemDiv.onclick = () => selectTemplate(item.type);
+
+                itemDiv.innerHTML = `
+                    <img src="${item.image}" alt="${item.name}">
+                    <span>${item.name}</span>
+                `;
+
+                columns[category.name].appendChild(itemDiv);
+            });
+        });
+
+        // Append all columns to the dropup content
+        for (const categoryName in columns) {
+            dropupContent.appendChild(columns[categoryName]);
+        }
+    }
+
+    let dropupOpen = false; // Track if the dropup is currently open.
+
+    function selectTemplate(templateType) {
+
+    // Find the selected template from our data structure
+    let selectedTemplate = null;
+    for (const category of templateCategories) {
+        const found = category.items.find(item => item.type === templateType);
+        if (found) {
+            selectedTemplate = found;
+            break;
+        }
+    }
+
+    if (selectedTemplate) {
+        // Create a mock file object from the template image
+        fetch(selectedTemplate.image)
+            .then(res => res.blob())
+            .then(blob => {
+                const file = new File([blob], `${selectedTemplate.type}_template.png`, {
+                    type: 'image/png',
+                    lastModified: Date.now()
+                });
+
+                // Clear any existing files
+                selectedFiles = [file];
+
+                // Update the file input
+                updateInputFiles();
+
+                // Show the preview
+                previewImage();
+
+                // Add a chat message confirming the selection
+                addChatMessage(`You selected the ${selectedTemplate.name} template`, 'bot');
+
+                // Close the dropup menu
+                document.querySelector('.dropup-content').style.display = 'none';
+                dropupOpen = false;
+            })
+            .catch(error => {
+                console.error('Error loading template:', error);
+                addChatMessage('Failed to load the selected template', 'bot');
+            });
+    }
+}
+    function addChatMessage(message, sender) {
+        const chatMessages = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', `${sender}-message`);
+
+        const iconSpan = document.createElement('span');
+        iconSpan.classList.add('icon');
+
+        const iconImg = document.createElement('img');
+        iconImg.src = sender === 'bot' ? 'static/user.png' : 'static/user.png';
+        iconImg.alt = `${sender} icon`;
+        iconImg.style.width = '24px';
+        iconImg.style.height = '24px';
+
+        iconSpan.appendChild(iconImg);
+
+        const textDiv = document.createElement('div');
+        textDiv.classList.add('message-text');
+        textDiv.textContent = message;
+
+        messageDiv.appendChild(iconSpan);
+        messageDiv.appendChild(textDiv);
+        chatMessages.appendChild(messageDiv);
+
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function toggleDropup() {
+        dropupOpen = !dropupOpen; // Toggle the state
+        const dropupContent = document.querySelector('.dropup-content');
+        dropupContent.style.display = dropupOpen ? 'flex' : 'none';
+    }
+
+
+    // Initialize the template menu when the page loads
+    document.addEventListener('DOMContentLoaded', renderTemplateCategories);
+
+    // JavaScript function to toggle the chatbot visibility
+    function toggleChatbot() {
+        var chatbotContainer = document.getElementById('chatbot-container');
+        if (chatbotContainer.style.display === 'none' || chatbotContainer.style.display === '') {
+            chatbotContainer.style.display = 'flex';
+            renderTemplateCategories(); // Make sure to render the templates when the chatbot opens
+        } else {
+            chatbotContainer.style.display = 'none';
+        }
+    }
+
+    document.addEventListener('click', function(event) {
+    const dropupContent = document.querySelector('.dropup-content');
+    const dropupButton = document.getElementById('start-prompt-button');
+    
+    if (dropupOpen && 
+        !dropupContent.contains(event.target) && 
+        !dropupButton.contains(event.target)) {
+        dropupContent.style.display = 'none';
+        dropupOpen = false;
+    }
+});
+</script>

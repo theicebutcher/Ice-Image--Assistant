@@ -1,0 +1,6 @@
+Flask
+openai
+python-dotenv
+rapidfuzz
+flask-cors
+Pillow
